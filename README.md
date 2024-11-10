@@ -10,17 +10,11 @@ complexity across millions of Reddit posts over a 16-year period.
 ## Table of Contents
 
 - [Project Overview](#project-overview)
-- [Obtaining Reddit Data](#obtaining-reddit-data)
+- [Obtaining Relevant Data](#obtaining-releval-data)
+- [Generating Figures](#generating-figures)
+- [Obtaining Complete Reddit Data](#obtaining-complete-reddit-data) (Optional)
   - [Prerequisites](#prerequisites)
   - [Step-by-Step Guide](#step-by-step-guide)
-    - [Step 1: Navigate to AcademicTorrents.com](#step-1-navigate-to-academictorrentscom)
-    - [Step 2: Find the Reddit Dataset](#step-2-find-the-reddit-dataset)
-    - [Step 3: Download the .torrent File or Use the Magnet Link](#step-3-download-the-torrent-file-or-use-the-magnet-link)
-    - [Step 4: Start the Download with aria2c](#step-4-start-the-download-with-aria2c)
-    - [Step 5: Verify and Access the Data](#step-5-verify-and-access-the-data)
-    - [Step 6: Decompressing .zst Files (If Needed)](#step-6-decompressing-zst-files-if-needed)
-    - [Step 7: Organize or Process the Data (Optional)](#step-7-organize-or-process-the-data-optional)
-    - [Step 8: Backup the Data (Optional)](#step-8-backup-the-data-optional)
   - [Tips and Notes](#tips-and-notes)
 - [Setup and Installation](#setup-and-installation)
 - [Usage](#usage)
@@ -31,6 +25,26 @@ complexity across millions of Reddit posts over a 16-year period.
 - [Reproducibility](#reproducibility)
 - [Contributing](#contributing)
 - [License](#license)
+
+## Obtaining Relevant Data
+
+All the data used in the manuscript is freely available at [Data Repository on
+FigShare](http://dx.doi.org/10.6084/m9.figshare.26828467).
+
+## Generating Figures
+
+All figures presented in the analysis can be reproduced using the extracted and
+derived data by accessing the live Google Colab page. This Colab notebook
+provides an interactive environment where users can run the analyses and
+generate each figure step-by-step.
+
+To get started, open the Colab notebook using the following link:
+
+[Google Colab: Climate Data Analysis and Visualization](https://colab.research.google.com/drive/1PpIRVvIvzowMVH44hjXSuFX6AGdV93YI?authuser=1#revisionId=0B1uzaQumGqFNRm5BdU94a0YydFk0Ym5jZFEwMjEvSUZsbkNzPQ)
+
+Simply run the notebook to load the data, execute the analyses, and produce the
+visualizations. This approach ensures full reproducibility of the figures from
+the extracted Reddit data.
 
 ## Project Overview
 
@@ -49,7 +63,25 @@ engagement and sentiment. Key insights include:
 - Increasing linguistic complexity in discussions involving "climate change,"
   potentially impacting accessibility and engagement.
 
-## Obtaining Reddit Data
+### Processing Large and Compressed Data
+
+This project uses `PolyReader` and `PolyWriter` for efficient reading and
+writing of Reddit JSONL files, even if they are compressed or located
+remotely. These utilities support a variety of compression formats (`.zst`,
+`.bz2`, `.gzip`) and access methods, including:
+
+- **Local Storage**: Read and write from files stored locally on disk.
+- **Remote Access**: Supports FTP, SFTP, SSH, HTTPS, and other protocols,
+    enabling direct processing without needing to download the entire dataset to
+    local storage.
+- **On-the-Fly Decompression**: Automatically decompresses data while reading,
+    saving storage space and processing time for large datasets.
+
+With `PolyReader` and `PolyWriter`, there’s no need to decompress files in
+advance, even for remote or compressed data sources, making it easier to process
+Reddit’s vast data archives.
+
+## Obtaining Complete Reddit Data
 
 **NOTE:** This is optional. The raw extracted data is provided via the
 [Data Repository on FigShare](http://dx.doi.org/10.6084/m9.figshare.26828467).
@@ -124,7 +156,7 @@ This guide provides detailed steps to download Reddit data in JSONL format from 
 2. The files should be in **JSONL** format, where each line in a file is a JSON
    object representing a Reddit post or comment. These files may be compressed
    in `.zst` (Zstandard) format, typically named as `RC_YYYY-MM.zst` for comments
-   and `RS_YYYY-MM.zst` for submissions. Decompression is necessary before 
+   and `RS_YYYY-MM.zst` for submissions. Decompression is necessary before
    processing, or you can use tools that support on-the-fly decompression.
 
 #### Step 6: Decompressing `.zst` Files (If Needed)
