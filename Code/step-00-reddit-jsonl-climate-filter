@@ -1,0 +1,134 @@
+#!/usr/bin/env python3
+"""
+A script to process Reddit JSONL files and filter climate-related posts.
+
+This script utilizes `PolyReader` and `PolyWriter` for efficient reading and writing
+of large datasets, supporting both compressed files (e.g., .zst, .bz2, .gzip) and remote
+files accessed over FTP, SFTP, SSH, HTTPS, and other protocols. It filters lines containing
+climate-related terms ('climate' and 'change' or 'global' and 'warming') in any order
+in the 'body' or 'title' fields.
+
+Filtered posts are output to compressed `.zst` files, enabling efficient storage and access.
+"""
+
+import argparse
+import json
+import re
+import sys
+import zstandard as zstd
+from pathlib import Path
+
+# Resolve script directory for relative imports
+SCRIPT_DIR = Path(__file__).resolve().parent
+sys.path.extend([
+    str(SCRIPT_DIR / "lib"),
+    str(SCRIPT_DIR / "pylib"),
+])
+
+from general.procs import ProcInfo
+from general.polyfile import PolyReader, PolyWriter
+
+
+class ClimateFilterProc(ProcInfo):
+    """Processes Reddit JSONL files to filter climate-related posts."""
+
+    def __init__(self):
+        """Initialize the process with arguments and setup."""
+        parser = argparse.ArgumentParser(description='Process Reddit JSONL files for climate-related posts.')
+        parser.add_argument('--output-dir', required=True, help="Directory to save output files.")
+        parser.add_argument('input_files', nargs='+', help="One or more Reddit JSONL files to process.")
+        parser.add_argument('--match', default=r'climat.*chang|chang.*climat|glob.*warm|warm.*glob',
+                            help="Regex pattern to match content in 'body' or 'title' fields.")
+        args = parser.parse_args()
+        args.log_dir = Path(args.output_dir) / "logs"
+        super().__init__(args)
+        self.output_dir = Path(args.output_dir)
+        self.output_dir.mkdir(parents=True, exist_ok=True)
+        self.match_regex = re.compile(args.match)
+        self.info(f"Using match pattern: {args.match}")
+        pass  # for auto-indentation
+
+    def process_file(self, input_file: str):
+        """
+        Process an individual file line by line, filtering based on the regex pattern.
+
+        This method uses `PolyReader` to handle compressed or remote files, processing
+        lines containing climate-related terms. Matching posts are saved with `PolyWriter`
+        to compressed `.zst` files for efficient storage.
+
+        Args:
+            input_file (str): Path or URL to a Reddit JSONL file to process.
+        """
+        input_path = Path(input_file)
+        output_path = self.output_dir / f"{input_path.stem}.zst"
+
+        # Check if the output file already exists
+        if output_path.exists():
+            self.warn(f"Skipping {input_path} because output file {output_path} already exists.")
+            pass  # for auto-indentation
+            return
+
+        self.info(f"Processing {input_path}")
+        self.info(f"Creating output file: {output_path}")
+
+        with PolyReader(input_file) as reader, PolyWriter(str(output_path)) as writer:
+            try:
+                for line in reader:
+                    # Increment line counter and display progress periodically
+                    self.line_no += 1
+                    if self.line_no % 1_000_000 == 0:
+                        # Let users know what's happening.
+                        self.pinfo("Running:", input_path)
+                        pass
+                    # Remove null characters and load JSON
+                    line = line.replace('\0', '')
+                    try:
+                        data = json.loads(line)
+                    except json.JSONDecodeError:
+                        self.warning(f"Skipping invalid JSON in {input_path}")
+                        continue
+                        pass  # for auto-indentation
+
+                    # Check for climate-related content
+                    text_content = (data.get('title', '') + " " + data.get('body', '')).lower()
+                    if self.match_regex.search(text_content):
+                        self.match_no += 1
+                        writer.write(line)
+                        pass  # for auto-indentation
+                    pass  # for auto-indentation
+                pass  # for auto-indentation
+            except zstd.ZstdError as err:
+                self.error(str(err))
+                self.error(f"Reading {input_file}")
+                self.error(f"Line {self.line_no}")
+                raise err
+            pass  # for auto-indentation
+        # Provide completion information.
+        self.pinfo("Complete:", input_path)
+        pass  # for auto-indentation
+
+    def pinfo(self, preface: str, input_path: Path):
+        secs = self.elapsed()
+        rate = self.prate(self.line_no / secs)
+        time = self.ptime()
+        line_num = self.pnum(self.line_no)
+        match_num = self.pnum(self.match_no)
+        percent = 1_000_000 * self.match_no / self.line_no
+        self.info(f"{preface} {time} {rate} - Lines: {line_num} Matches: {match_num} ({percent:0.2f}ppm) File: {input_path.stem}")
+        pass  # for auto-indentation
+
+    def run(self):
+        """Execute the filtering process for all specified input files."""
+        self.info("Starting climate-related Reddit JSONL processing")
+        self.line_no = 0
+        self.match_no = 0
+        for input_file in self.args.input_files:
+            self.process_file(input_file)
+            pass  # for auto-indentation
+        self.info("Processing complete")
+        pass  # for auto-indentation
+
+
+if __name__ == "__main__":
+    ClimateFilterProc().run()
+    pass  # for auto-indentation
