@@ -10,7 +10,7 @@ complexity across millions of Reddit posts over a 16-year period.
 ## Table of Contents
 
 - [Project Overview](#project-overview)
-- [Obtaining Relevant Data](#obtaining-releval-data)
+- [Obtaining Relevant Data](#obtaining-relevant-data)
 - [Generating Figures](#generating-figures)
 - [Obtaining Complete Reddit Data](#obtaining-complete-reddit-data) (Optional)
   - [Prerequisites](#prerequisites)
@@ -29,7 +29,12 @@ complexity across millions of Reddit posts over a 16-year period.
 ## Obtaining Relevant Data
 
 All the data used in the manuscript is freely available at [Data Repository on
-FigShare](http://dx.doi.org/10.6084/m9.figshare.26828467).
+FigShare](http://dx.doi.org/10.6084/m9.figshare.26828467). This section, along
+with the following [Generating Figures](#generating-figures) section, is
+sufficient to replicate the findings and figures of the study. If you are only
+interested in reproducing the figures and analysis, you can skip the
+[Obtaining Complete Reddit Data](#obtaining-complete-reddit-data) and
+subsequent sections.
 
 ## Generating Figures
 
@@ -40,7 +45,8 @@ generate each figure step-by-step.
 
 To get started, open the Colab notebook using the following link:
 
-[Google Colab: Climate Data Analysis and Visualization](https://colab.research.google.com/drive/1PpIRVvIvzowMVH44hjXSuFX6AGdV93YI?authuser=1#revisionId=0B1uzaQumGqFNRm5BdU94a0YydFk0Ym5jZFEwMjEvSUZsbkNzPQ)
+[Google Colab: Climate Data Analysis and
+Visualization](https://colab.research.google.com/drive/1PpIRVvIvzowMVH44hjXSuFX6AGdV93YI?authuser=1#revisionId=0B1uzaQumGqFNRm5BdU94a0YydFk0Ym5jZFEwMjEvSUZsbkNzPQ)
 
 Simply run the notebook to load the data, execute the analyses, and produce the
 visualizations. This approach ensures full reproducibility of the figures from
@@ -66,9 +72,9 @@ engagement and sentiment. Key insights include:
 ### Processing Large and Compressed Data
 
 This project uses `PolyReader` and `PolyWriter` for efficient reading and
-writing of Reddit JSONL files, even if they are compressed or located
-remotely. These utilities support a variety of compression formats (`.zst`,
-`.bz2`, `.gzip`) and access methods, including:
+writing of Reddit JSONL files, even if they are compressed or located remotely.
+These utilities support a variety of compression formats (`.zst`, `.bz2`,
+`.gzip`) and access methods, including:
 
 - **Local Storage**: Read and write from files stored locally on disk.
 - **Remote Access**: Supports FTP, SFTP, SSH, HTTPS, and other protocols,
@@ -86,7 +92,8 @@ Reddit’s vast data archives.
 **NOTE:** This is optional. The raw extracted data is provided via the
 [Data Repository on FigShare](http://dx.doi.org/10.6084/m9.figshare.26828467).
 
-This guide provides detailed steps to download Reddit data in JSONL format from AcademicTorrents.com using a non-GUI torrent tool.
+This guide provides detailed steps to download Reddit data in JSONL format from
+AcademicTorrents.com using a non-GUI torrent tool.
 
 ### Prerequisites
 
@@ -127,14 +134,18 @@ This guide provides detailed steps to download Reddit data in JSONL format from 
 
 #### Step 3: Download the .torrent File or Use the Magnet Link
 
-1. On the dataset page, you’ll see options to either **Download .torrent** or **Copy Magnet Link**.
-   - If using the **Download .torrent** option, save the `.torrent` file to your computer.
-   - If using the **Magnet Link**, copy it to your clipboard (right-click and select “Copy link address”).
+1. On the dataset page, you’ll see options to either **Download .torrent** or
+   **Copy Magnet Link**.
+   - If using the **Download .torrent** option, save the `.torrent` file to your
+     computer.
+   - If using the **Magnet Link**, copy it to your clipboard (right-click and
+     select “Copy link address”).
 
 #### Step 4: Start the Download with aria2c
 
 1. Open a terminal on your Linux machine.
-2. Use one of the following commands depending on whether you downloaded a `.torrent` file or copied the magnet link.
+2. Use one of the following commands depending on whether you downloaded a
+   `.torrent` file or copied the magnet link.
 
    - **If using a `.torrent` file**:
      ```bash
@@ -155,9 +166,10 @@ This guide provides detailed steps to download Reddit data in JSONL format from 
 
 2. The files should be in **JSONL** format, where each line in a file is a JSON
    object representing a Reddit post or comment. These files may be compressed
-   in `.zst` (Zstandard) format, typically named as `RC_YYYY-MM.zst` for comments
-   and `RS_YYYY-MM.zst` for submissions. Decompression is necessary before
-   processing, or you can use tools that support on-the-fly decompression.
+   in `.zst` (Zstandard) format, typically named as `RC_YYYY-MM.zst` for
+   comments and `RS_YYYY-MM.zst` for submissions. Decompression is necessary
+   before processing, or you can use tools that support on-the-fly
+   decompression.
 
 #### Step 6: Decompressing `.zst` Files (If Needed)
 
