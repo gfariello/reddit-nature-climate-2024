@@ -1,0 +1,769 @@
+#!/usr/bin/env python3
+"""
+step-01-jsonl2csv - A script to process JSONL files from PushShift.io for Reddit data,
+extracting information into structured CSV files.
+
+This script processes compressed Reddit JSONL data files, specifically from the PushShift.io
+dataset, filtering and organizing information by extracting relevant fields from JSON objects.
+It outputs the results into CSV files, handling large files efficiently, including
+optional compression. Additionally, the script includes tools for header management and logging.
+
+Main Classes
+------------
+- `Proc`: Handles the primary process of reading JSONL files, extracting data, and managing
+  file I/O, including CSV creation, merging sorted files, and logging.
+- `OutRow`: Supports efficient row handling during merging of multiple sorted CSV files.
+
+Key Functions
+-------------
+- `process`: Processes each line in a JSONL file, extracting specified data and organizing
+  it into structured CSV rows.
+- `merge_sorted`: Merges multiple sorted CSV files into a single sorted output file, handling
+  ordering based on several key fields.
+- `run`: Main execution function that coordinates the full file processing workflow,
+  including header file creation, line counting, sorting, and final CSV output.
+
+Usage
+-----
+    step-01-jsonl2csv -i INPUT_FILE -o OUTPUT_DIR [options]
+
+Options
+-------
+    - `-d`, `--debug`: Enables debug mode for detailed logging.
+    - `-c`, `--create-headers`: Generates header files and exits, without processing JSONL data.
+    - `-N`, `--num-lines-info`: Specifies the number of lines to process before logging status.
+    - `-L`, `--lines-per-file`: Limits the number of lines per temporary file.
+    - `-i`, `--input-file`: Specifies the input JSONL file.
+    - `-q`, `--quiet`: Decreases verbosity of output logs.
+    - `-v`, `--verbose`: Increases verbosity for detailed logs.
+
+Attributes
+----------
+    - `headers`: A list of fields extracted from JSONL and written into the output CSV.
+    - `_output_fh`: A file handle for output file writing.
+    - `sorted_dir`: Directory path for intermediate sorted CSV files.
+    - `final_output_file`: The final compressed CSV output file.
+
+Example
+-------
+    python3 step-01-jsonl2csv -i data/RC_2023-03.zst -o output/Step-01-Extracted-CSVs
+
+Dependencies
+------------
+    Requires `general.procs.ProcInfo` for process management and logging, and
+    `general.polyfile` for file reading and writing, which supports compressed and
+    remote files.
+
+Notes
+-----
+- The script expects the input file name to match a specific format: 'RC_YYYY-MM.zst'
+  or 'RS_YYYY-MM.zst', indicating Reddit Comments or Submissions by month and year.
+- It generates log files and maintains status updates for large file handling.
+- Temporary files created during the sorting process are removed automatically after
+  merging is completed.
+
+"""
+import sys
+import argparse
+import os
+import json
+import re
+import csv
+import datetime as dt
+import time
+from pathlib import Path
+
+# Resolve script directory for relative imports
+SCRIPT_DIR = Path(__file__).resolve().parent
+sys.path.extend([
+    str(SCRIPT_DIR / "lib"),
+    str(SCRIPT_DIR / "pylib"),
+])
+
+from general.procs import ProcInfo
+from general.polyfile import PolyReader, PolyWriter
+from RedditHeaderInfo import RedditHeaderInfo  # noqa: E402
+
+# Allow for ridiculously long posts
+csv.field_size_limit(sys.maxsize)
+
+
+class OutRow:
+    """Represents a row in a CSV file read through PolyReader, enabling efficient row handling for sorted merging."""
+
+    def __init__(self, filename: str):
+        """
+        Initializes the OutRow instance with the given filename, opening it for reading.
+
+        Args:
+            filename (str): Path to the CSV file to read.
+
+        Raises:
+            StopIteration: If the file is empty and the first row cannot be read.
+        """
+        self.filename = filename
+        self.p = PolyReader(filename).open()
+        self.reader = csv.reader(self.p)
+        self.lines = 0
+
+        try:
+            self.row = next(self.reader)
+        except StopIteration:
+            print(f"ERROR: Could not get first row of {self.filename} ({self.reader}).")
+            exit()
+        pass  # for auto-indentation
+
+    def next(self) -> None:
+        """Advances to the next row in the CSV reader."""
+        self.row = next(self.reader)
+        pass  # for auto-indentation
+
+    pass  # for class definition
+
+
+class Proc(RedditHeaderInfo):
+    _output_fh = None
+
+    def __init__(self, fh=None):
+        """Init this object."""
+        parser = argparse.ArgumentParser(
+            description='Create CSV files from PushShift.io JSONL files.')
+        parser.add_argument('--debug', '-d', default=False, action='store_true', dest='debug', help="Turn debugging on.")  # noqa: E501
+        parser.add_argument('--create-headers', '-c', default=False, action='store_true', dest='create_headers', help="Create header files and exit.")  # noqa: E501
+        parser.add_argument('--num-lines-info', '-N', default=1_000_000, type=int, dest='num_lines_info', help="Print info ever NUM lines processed.", metavar="NUM")  # noqa: E501
+        parser.add_argument('--lines-per-file', '-L', default=2_000_000, type=int, dest='lines_per_file', help="Put at most NUM lines in each temp file.", metavar="NUM")  # noqa: E501
+        parser.add_argument('--input-file', '-i', default=None, required=True, dest='input_file', help="The input file.", metavar="file")  # noqa: E501
+        parser.add_argument('--quiet', '-q', default=0, dest='quiet', action='count', help="Decrease verbosity. Can have multiple.")  # noqa: E501
+        parser.add_argument('--verbose', '-v', default=0, dest='verbosity', action='count', help="Increase verbosity. Can have multiple.")  # noqa: E501
+        ProcInfo.set_argparse_parser(parser)
+        args = parser.parse_args()
+        args.verbosity = 1 + args.verbosity - args.quiet
+        args.log_dir = Path(args.input_file).parent.parent / 'Step-01-Extracted-CSVs' / 'logs'
+        super().__init__(args)
+        if self.args.num_lines_info > self.args.lines_per_file:
+            return self.fatal(f"--lines-per-file {self.args.lines_per_file} must be greater than or equal to --num-lines-info {self.args.num_lines_info}")
+        if self.args.lines_per_file % self.args.num_lines_info != 0:
+            return self.fatal(f"--lines-per-file {self.args.lines_per_file} must be divisible by --num-lines-info {self.args.num_lines_info}")
+        if not os.path.exists(self.args.input_file):
+            return self.fatal(f"{self.args.input_file} does not exist.")
+        self._re = re.compile(r'\w+')
+        self._current_file_key = None
+        self.headers = ['subreddit', 'parent_id', 'post_id', 'created',
+                        'author', 'author_deleted', 'year', 'month', 'day', 'hour',
+                        'minute', 'second', 'day_of_week', 'deleted_or_removed', 'archived',
+                        'cakeday', 'auth_created_utc', 'auth_has_flair',
+                        'auth_id', 'banned', 'had_html', 'brand_safe', 'call_to_action',
+                        'can_gild', 'can_mod_post', 'category', 'collapsed', 'contest_mode',
+                        'controversiality', 'crosspost_parent', 'distinguished', 'downs',
+                        'edited', 'embed_type', 'had_event', 'gild_count', 'hide_score',
+                        'is_crosspostable', 'is_meta', 'is_original_content',
+                        'is_reddit_media_domain', 'is_robot_indexable', 'is_self',
+                        'is_submitter', 'is_video', 'likes', 'locked', 'media_length',
+                        'media_embed_length', 'media_only', 'mod_reports', 'name',
+                        'no_follow', 'num_comments', 'num_crossposts', 'num_reports',
+                        'over_18', 'pinned', 'post_hint', 'preview_length', 'promoted',
+                        'pwls', 'quarantine', 'removal_reason', 'retrieved_on', 'rte_mode',
+                        'saved', 'score', 'score_hidden', 'secure_media_length',
+                        'secure_media_embed_length', 'send_replies', 'show_media',
+                        'spoiler', 'stickied', 'subreddit_subscribers', 'subreddit_type',
+                        'suggested_sort', 'third_party_trackers', 'third_party_tracking',
+                        'third_party_tracking_2', 'thumbnail', 'thumbnail_height',
+                        'thumbnail_width', 'ups', 'whitelist_status', 'title_text', 'body_text', ]
+        self._output_fh = None
+        self.step_00_dir = Path(self.args.input_file).parent
+        self.step_01_dir = self.step_00_dir.parent / 'Step-01-Extracted-CSVs'
+        self.info(f"Step 00 Directory: {self.step_00_dir}")
+        self.info(f"Step 01 Directory: {self.step_01_dir}")
+        if not self.step_00_dir.name == 'Step-00-JSONL':
+            return self.fatal(f"Expecting {self.args.input_file} to be in a Step-00-JSONL directory")
+        self.args.log_dir = os.path.join(self.step_01_dir, 'logs')
+        self.args.log_filename = os.path.join(self.args.log_dir, f"{os.path.basename(args.input_file)}-{self.UNIQUE_BASENAME}.log")
+        match = re.match(r'^R(C|S)_(\d{4}-\d{2})\.zst$', os.path.basename(self.args.input_file))
+        if not match:
+            return self.fatal(f"File name must be in RC_YYYY-MM.zst or RS_YYYY-MM.zst format, not {os.path.basename(self.args.input_file)}")
+        self.post_type = 'Comment' if match.group(1) == 'C' else 'Submission'
+        self.file_month = match.group(2)
+        self.file_count = 0
+        self.output_file = None
+        self.sorted_dir = os.path.join(self.step_01_dir, f"{self.post_type}s", "sorted")
+        self.final_output_file = os.path.join(self.step_01_dir, f"{self.post_type}s", f"Reddit{self.post_type}s-{self.file_month}.csv.zst")
+        self.mkdir(self.sorted_dir)
+        self.null_parent_ids = 0
+        self.int_parent_ids = 0
+        self.temp_files = []
+        if os.path.exists(self.final_output_file):
+            self.warn(f"{os.path.abspath(self.final_output_file)} exists. Remove it and all others for {os.path.basename(args.input_file)} in {self.sorted_dir} to re-process.")
+            return exit(0)
+        # self.fatal("Temporary kill.")
+        pass
+
+    def next_output_file(self):
+        self.file_count += 1
+        bname = f"Reddit{self.post_type}s-{self.file_month}.{self.file_count:03d}.csv.zst"
+        self.output_file = os.path.join(self.sorted_dir, bname)
+        if os.path.exists(self.output_file):
+            self.warn(f"{bname} exists. Remove it and all others for {os.path.basename(self.args.input_file)} in {self.sorted_dir} to re-process.")
+            return exit(0)
+        self.temp_files.append(self.output_file)
+        if self._output_fh:
+            self._output_fh.close()
+            pass
+        self.info(f"Creating: {self.output_file}")
+        self._output_fh = PolyWriter(self.output_file).open(backup=True)
+        self._writer = csv.writer(self._output_fh)
+
+    def get_val(self, key):
+        if key not in self._current_json_obj or "" == self._current_json_obj[key]:
+            return ''
+        val = self._current_json_obj[key]
+        if key in self._mappers and val in self._mappers[key]:
+            return self._mappers[key][val]
+        return val
+
+    def get_bool(self, key):
+        if key not in self._current_json_obj:
+            return ''
+        if self._current_json_obj[key]:
+            return 1
+        return 0
+
+    def get_int(self, key):
+        if key not in self._current_json_obj:
+            return ''
+        val = self._current_json_obj[key]
+        if val is None or isinstance(val, bool):
+            return 1 if val else 0
+        if val is None or isinstance(val, int):
+            return val
+        if isinstance(val, float):
+            return int(val)
+        if "." in val:
+            return int(float(val))
+        if val == "True":
+            return 1
+        if val == "False":
+            return 0
+        return int(val)
+
+    def get_dict(self, key):
+        if key not in self._current_json_obj or self._current_json_obj[key] is None or len(self._current_json_obj[key]) == 0:
+            return ''
+        tmp = []
+        for key, val in self._current_json_obj[key].items():
+            tmp.append(f"{key}:{val}")
+            pass
+        return ";".join(tmp)
+
+    def get_len(self, key):
+        if key not in self._current_json_obj or self._current_json_obj[key] is None:
+            return ''
+        return len(f"{self._current_json_obj[key]}")
+
+    def uniq_count(self, info_key, val):
+        if info_key not in self._info_dict:
+            self._info_dict[info_key] = {}
+            pass
+        if val not in self._info_dict[info_key]:
+            self._info_dict[info_key][val] = 0
+            pass
+        self._info_dict[info_key][val] += 1
+        return self
+
+    def cleanup(self):
+        if self.output_fh and not self.output_finished:
+            self.output_fh.close()
+            self.warn(f"Terminating before finished. Removing in-progress file '{self.output_csv_file}'")
+            os.remove(self.output_csv_file)
+            pass
+        self.output_finished = True
+        return self
+
+    def pinfo(self, text, line_count):
+        secs = time.monotonic() - self.t0
+        rate = line_count / secs
+        self.info(
+            f"{text}: {os.path.basename(self.args.input_file)} Processed {line_count:,d} lines at {self.prate(rate)}, "
+        )
+        pass
+
+    def process(self) -> 'Proc':
+        line_count = 0
+        bname = os.path.basename(self.args.input_file)
+        if bname.startswith("RC_"):
+            post_type = 'Comment'
+            prepend = 'b'
+            is_submission = False
+        elif bname.startswith("RS_"):
+            post_type = 'Submission'
+            prepend = 'b'
+            parent_id = ''
+            is_submission = True
+        else:
+            self.error(f"Unknown input file type {bname}.")
+            self.fatal("Can't continue.")
+            pass  # For auto-indent
+        rows = []
+        self.next_output_file()
+        # prev = None
+        for line in self._fd:
+            line_count += 1
+            line = line.replace('\x00', '').strip()
+            try:
+                json_obj = json.loads(line)
+            except Exception as err:
+                self.warn(
+                    f"Unable to decode JSON in {self.args.input_file} at line {line_count}\n"
+                    f"Line: '{line}'\n"
+                    f"ERROR: {err}"
+                )
+                continue
+            post_id = f"{prepend}{json_obj['id']}"
+            if is_submission:
+                depth = 0
+            else:
+                parent_id = json_obj['parent_id'] if 'parent_id' in json_obj else ''
+                try:
+                    if parent_id == '' or parent_id is None:
+                        parent_id = ''
+                        self.null_parent_ids += 1
+                        depth = ''  # This should never happen, but it does around 2023-2024
+                    elif isinstance(parent_id, int):
+                        parent_id = f"{parent_id}"
+                        self.int_parent_ids += 1
+                        depth = ''  # This should never happen, but it does around 2023-2024
+                    elif parent_id.startswith("t3_"):
+                        depth = 1
+                        parent_id = f"a{parent_id[3:]}"
+                    elif parent_id.startswith("t1_"):
+                        depth = ''
+                        parent_id = f"b{parent_id[3:]}"
+                    else:
+                        self.err(f"Unrecognized parent_id='{parent_id}', line {line_count} in {self.args.input_file}")
+                        pass
+                except Exception as exc:
+                    self.err(f"Failed to process parent_id = '{parent_id}'({type(parent_id)}).")
+                    print(json.dumps(json_obj))
+                    raise exc
+                    pass
+                pass
+            rows.append(self.process_line(json_obj, post_id, post_type, parent_id, depth))
+            # prev = json_obj
+            row = []
+            if line_count % self.args.num_lines_info == 0:
+                self.pinfo("Running", line_count)
+                if line_count % self.args.lines_per_file == 0:
+                    try:
+                        self.info(f"Sorting {self.args.lines_per_file:,d} rows for {bname} by subreddit, parent_id, post_id, and created")
+                        rows = sorted(rows, key=lambda row: (row[0], row[1], row[2], row[3]))
+                        for row in rows:
+                            self._writer.writerow(row)
+                            pass
+                    except Exception as err:
+                        self.error(f"row={row}")
+                        self.error(f"Error writing row {err}.")
+                        raise err
+                    rows = []
+                    self.next_output_file()
+                    pass
+                pass
+            pass
+        try:
+            self.info(f"Sorting last rows of {bname} by subreddit, parent_id, post_id, and created")
+            rows = sorted(rows, key=lambda row: (row[0], row[1], row[2], row[3]))
+            n = 0
+            for row in rows:
+                self._writer.writerow(row)
+                n += 1
+                pass
+            self.info(f"Wrote {n:,d} rows to {self.output_file}.")
+        except Exception as err:
+            self.error(f"row={row}")
+            self.error("Error writing row.")
+            raise err
+        self._finished = True
+        self.pinfo("Completed", line_count)
+        self._output_fh.close()
+        self.merge_sorted(line_count)
+        return line_count
+
+    def merge_sorted(self, line_count: int) -> None:
+        """
+        Merge multiple sorted CSV files into one sorted CSV file.
+
+        Args:
+            line_count (int): Expected number of lines in the merged file.
+
+        Example usage:
+            self.merge_sorted(1000)
+        """
+        to_file = os.path.join(self.step_01_dir, f"{self.post_type}s", f"Reddit{self.post_type}s-{self.file_month}.csv.zst")
+
+        # If there's only one file, rename it to the target file
+        if len(self.temp_files) == 1:
+            from_file = os.path.join(self.step_01_dir, f"{self.post_type}s", "sorted", f"Reddit{self.post_type}s-{self.file_month}.001.csv.zst")
+            self.info(f"Only one file for {os.path.basename(self.args.input_file)}. Renaming {from_file} to {to_file}")
+            os.rename(from_file, to_file)
+            return
+            pass  # For auto-indentation
+
+        tmp_t0 = self.now()
+
+        # Open the target file for writing
+        to_poly = PolyWriter(to_file).open()
+        to_csv = csv.writer(to_poly)
+
+        # Get the first row from each input CSV
+        next_rows = []
+        for f in self.temp_files:
+            next_rows.append(OutRow(f))
+            pass  # For auto-indentation
+
+        self.info(f"Merging {len(self.temp_files)} sorted files for {os.path.basename(self.args.input_file)}.")
+
+        written_line_count = 0
+        done_files = []
+
+        while next_rows:
+            # Sort the next rows
+            next_rows = sorted(next_rows, key=lambda x: (x.row[0], x.row[1], x.row[2], x.row[2]))
+            # Write the first one
+            to_csv.writerow(next_rows[0].row)
+            next_rows[0].lines += 1
+            written_line_count += 1
+            try:
+                next_rows[0].next()
+            except StopIteration:
+                self.debug(f"Done with {next_rows[0].filename}")
+                next_rows[0].p.close()
+                done_files.append(next_rows.pop(0))
+                pass  # For auto-indentation
+            pass  # For auto-indentation
+
+        # Close output PolyWriter
+        to_poly.close()
+        if next_rows:
+            self.warn(f"next_rows={next_rows}")
+            pass  # For auto-indentation
+
+        # Verify the line count
+        if written_line_count != line_count:
+            in_lines = [x.lines for x in done_files]
+            self.error(f"Line count mismatch for {os.path.basename(self.args.input_file)}: expected {line_count:,d}, but got {written_line_count:,d}.")
+            self.error(f"Total read: {sum(in_lines)} ; {in_lines}")
+            self.error(f"next_rows = {next_rows}")
+            self.exit_errors()
+            pass  # For auto-indentation
+
+        # Delete all temporary files if everything went well
+        self.info(f"Removing intermediate files for {os.path.basename(self.args.input_file)}.")
+        for temp_file in self.temp_files:
+            os.remove(temp_file)
+            pass  # For auto-indentation
+        secs = self.elapsed(tmp_t0)
+        self.info(f"Merging complete in {self.secs2str(secs)} "
+                  f"({self.prate(written_line_count/secs, 'rows')}) "
+                  f"for {len(self.temp_files)} files for "
+                  f"{os.path.basename(self.args.input_file)}.")
+        self.info(f"Merged file: {to_file} with {written_line_count} lines.")
+        pass  # For auto-indentation
+
+    # All one-byte UTF-8 printable chars minus double-quote
+    # (") and comma "," for compatifying large ints for CSVs
+    _nums = chars = [
+        chr(i) for i in range(256) if chr(i).isprintable() and len(chr(i)) == 1 and chr(i) not in {'"', ','}
+    ]
+
+    def bytes2int(self, bytestr: bytes) -> int:
+        n = 0
+        for byte in bytestr:
+            n = n << 8 | byte
+            pass
+        return n
+
+    def base187(self, n: int) -> str:
+        """Get a base187 number suitable for storing large numbers in CSV files compactly."""
+        return ((n == 0) and self._nums[0]) or (self.base187(n // 187).lstrip(self._nums[0]) + self._nums[n % 187])
+
+    def get_clean_text(self, json_obj: dict, key: str) -> str:
+        if key not in json_obj:
+            return None
+        return json_obj[key].replace('\\', '\\\\').replace('\n', '\\n').replace('\r', '\\r').replace('\f', '\\f').replace('\0', '\\0')
+
+    def process_line(self, json_obj: dict, post_id: str, post_type: str, parent_id: str, depth: int):
+        self.prev_id = post_id
+        self._current_json_obj = json_obj
+        created = int(json_obj['created_utc'])
+        subreddit = self.get_val('subreddit')
+        udd = dt.datetime.fromtimestamp(created, dt.timezone.utc)
+        year, month, day, hour, minute, second, day_of_week = udd.year, udd.month, udd.day, udd.hour, udd.minute, udd.second, udd.weekday()
+        author = self.get_val('author')
+        author_deleted = 1 if author == '[deleted]' else 0
+        title = self.get_clean_text(json_obj, 'title')
+        body = self.get_clean_text(json_obj, 'body')
+        deleted_or_removed = 1 if title == '[deleted]' or title == '[removed]' or body == '[deleted]' or body == '[removed]' else 0
+        crosspost_parent = self.get_val('crosspost_parent')
+        if crosspost_parent:
+            if crosspost_parent.startswith("t3_"):
+                crosspost_parent = f"a{crosspost_parent[3:]}"
+            elif crosspost_parent.startswith("t1_"):
+                crosspost_parent = f"b{crosspost_parent[3:]}"
+                pass
+            pass
+        return [
+            subreddit,
+            parent_id,
+            post_id,
+            created,
+            author,
+            author_deleted,
+            year,
+            month,
+            day,
+            hour,
+            minute,
+            second,
+            day_of_week,
+            deleted_or_removed,
+            self.get_bool('archived'),
+            self.get_bool('author_cakeday'),
+            self.get_int('author_created_utc'),
+            self.get_bool('author_flair_text'),
+            self.get_val('author_id'),
+            self.get_bool('banned_by'),
+            1 if 'body_html' in json_obj or 'selftext_html' in json_obj else None,
+            self.get_bool('brand_safe'),
+            self.get_val('call_to_action'),
+            self.get_bool('can_gild'),
+            self.get_bool('can_mod_post'),
+            self.get_val('category'),
+            self.get_bool('collapsed'),
+            self.get_bool('contest_mode'),
+            self.get_bool('controversiality'),
+            crosspost_parent,
+            self.get_val('distinguished'),
+            self.get_int('downs'),
+            self.get_int('edited'),
+            self.get_val('embed_type'),
+            1 if 'event_start' in json_obj or 'event_end' in json_obj or 'event_is_live' in json_obj else 0,
+            self.get_int('gilded'),
+            self.get_bool('hide_score'),
+            self.get_bool('is_crosspostable'),
+            self.get_bool('is_meta'),
+            self.get_bool('is_original_content'),
+            self.get_bool('is_reddit_media_domain'),
+            self.get_bool('is_robot_indexable'),
+            self.get_bool('is_self'),
+            self.get_bool('is_submitter'),
+            self.get_bool('is_video'),
+            self.get_int('likes'),
+            self.get_bool('locked'),
+            self.get_len('media'),
+            self.get_len('media_embed'),
+            self.get_bool('media_only'),
+            0 if 'mod_reports' not in json_obj else 1,
+            self.get_val('name'),
+            self.get_bool('no_follow'),
+            self.get_int('num_comments'),
+            self.get_int('num_crossposts'),
+            self.get_int('num_reports'),
+            self.get_bool('over_18'),
+            self.get_bool('pinned'),
+            self.get_val('post_hint'),
+            self.get_len('preview'),
+            self.get_bool('promoted'),
+            self.get_int('pwls'),
+            self.get_bool('quarantine'),
+            self.get_val('removal_reason'),
+            self.get_int('retrieved_on'),
+            self.get_val('rte_mode'),
+            self.get_bool('saved'),
+            self.get_int('score'),
+            self.get_bool('score_hidden'),
+            self.get_len('secure_media'),
+            self.get_len('secure_media_embed'),
+            self.get_bool('send_replies'),
+            self.get_bool('show_media'),
+            self.get_bool('spoiler'),
+            self.get_bool('stickied'),
+            self.get_int('subreddit_subscribers'),
+            self.get_val('subreddit_type'),
+            self.get_val('suggested_sort'),
+            self.get_len('third_party_trackers'),
+            1 if 'third_party_tracking' in json_obj else 0,
+            1 if 'third_party_tracking_2' in json_obj else 0,
+            1 if 'thumbnail' in json_obj and json_obj['thumbnail'] else 0,
+            self.get_int('thumbnail_height'),
+            self.get_int('thumbnail_width'),
+            self.get_int('ups'),
+            self.get_val('whitelist_status'),
+            title,
+            body,
+        ]
+
+    def file_older_than_24_hours(self, file_path):
+        if not os.path.exists(file_path):
+            return True
+        file_mod_time = os.path.getmtime(file_path)
+        current_time = time.time()
+        return (current_time - file_mod_time) > 86400  # 86400 seconds = 24 hours
+
+    def _updir(self, path):
+        return os.path.basename(path), os.path.dirname(path)
+
+    def run(self):
+        self._start_time = time.time()
+        self.mkdir(self.step_01_dir)
+        # Path to the headers.csv file
+        headers_csv_path = os.path.join(self.step_01_dir, "headers.csv")
+        try:
+            if self.file_older_than_24_hours(headers_csv_path) or self.args.create_headers:
+                with self.open(headers_csv_path, 'w') as fh:
+                    fh.write("subreddit,"
+                             "parent_id,"
+                             "post_id,"
+                             "created,"
+                             "author,"
+                             "author_deleted,"
+                             "year,"
+                             "month,"
+                             "day,"
+                             "hour,"
+                             "minute,"
+                             "second,"
+                             "day_of_week,"
+                             "deleted_or_removed,"
+                             "archived,"
+                             "cakeday,"
+                             "author_created_utc,"
+                             "auth_has_flair,"
+                             "author_id,"
+                             "banned,"
+                             "had_html,"
+                             "brand_safe,"
+                             "call_to_action,"
+                             "can_gild,"
+                             "can_mod_post,"
+                             "category,"
+                             "collapsed,"
+                             "contest_mode,"
+                             "controversiality,"
+                             "crosspost_parent,"
+                             "distinguished,"
+                             "downs,"
+                             "edited,"
+                             "embed_type,"
+                             "had_event,"
+                             "gild_count,"
+                             "hide_score,"
+                             "is_crosspostable,"
+                             "is_meta,"
+                             "is_original_content,"
+                             "is_reddit_media_domain,"
+                             "is_robot_indexable,"
+                             "is_self,"
+                             "is_submitter,"
+                             "is_video,"
+                             "likes,"
+                             "locked,"
+                             "media_length,"
+                             "media_embed_length,"
+                             "media_only,"
+                             "mod_reports,"
+                             "name,"
+                             "no_follow,"
+                             "num_comments,"
+                             "num_crossposts,"
+                             "num_reports,"
+                             "over_18,"
+                             "pinned,"
+                             "post_hint,"
+                             "preview_length,"
+                             "promoted,"
+                             "pwls,"
+                             "quarantine,"
+                             "removal_reason,"
+                             "retrieved_on,"
+                             "rte_mode,"
+                             "saved,"
+                             "score,"
+                             "score_hidden,"
+                             "secure_media_length,"
+                             "secure_media_embed_length,"
+                             "send_replies,"
+                             "show_media,"
+                             "spoiler,"
+                             "stickied,"
+                             "subreddit_subscribers,"
+                             "subreddit_type,"
+                             "suggested_sort,"
+                             "third_party_trackers,"
+                             "third_party_tracking,"
+                             "third_party_tracking_2,"
+                             "thumbnail,"
+                             "thumbnail_height,"
+                             "thumbnail_width,"
+                             "ups,"
+                             "whitelist_status,"
+                             "title_text,"
+                             "body_text\n")
+        except FileNotFoundError:
+            pass
+
+        # Path to the headers-info.txt file
+        headers_info_txt_path = os.path.join(self.step_01_dir, "headers-info.txt")
+        self.info_file = os.path.join(self.step_01_dir, "Step-01-Extracted-CSVs-Substep-01.processed-file-info.csv")
+        try:
+            if self.file_older_than_24_hours(headers_info_txt_path) or self.args.create_headers:
+                with self.open(headers_info_txt_path, 'w') as fh:
+                    fh.write("Header: Description\n")
+                    for k in self.headers:
+                        v = self._output_headers[k]
+                        if k in self._mappers:
+                            new_v = "Values converted to numbers:"
+                            for k2, v2 in self._mappers[k].items():
+                                new_v += f" {v2} = {k2}."
+                                pass
+                            v = new_v
+                            pass
+                        fh.write(f"{k}: {v}\n")
+            if not os.path.exists(self.info_file):
+                with self.open(self.info_file, 'w') as fh:
+                    fh.write("File,Processed Records,Start,Run Seconds,Run Time,Rate,Null Parent IDs,Int Parent IDs,Month,Processing Script,Input Filename,Output File,\n")
+                    pass
+                pass
+        except FileNotFoundError:
+            pass
+        if self.args.create_headers:
+            return exit()
+        self.info(f"Reading: {self.args.input_file}")
+        self._fd = PolyReader(self.args.input_file).open()
+        self.t0 = time.monotonic()
+        line_count = self.process()
+        self.exit_errors()
+        with self.open(self.info_file, 'a') as fh:
+            secs = time.monotonic() - self.t0
+            fh.write(
+                f"{os.path.basename(self.args.input_file)},"
+                f"{line_count},"
+                f"{self.START_TIMESTAMP_STR},"
+                f"{secs:0.2f},"
+                f"{self.ptime(secs)},"
+                f"{self.prate(line_count/secs)},"
+                f"{self.null_parent_ids},"
+                f"{self.int_parent_ids},"
+                f"{self.file_month},"
+                f"{self.MAIN_BASENAME},"
+                f"{self.args.input_file},"
+                f"{self.output_file}\n")
+            pass
+        self.info("FINISHED")
+        return self
+
+    pass
+
+
+if __name__ == "__main__":
+    p = Proc()
+    p.run()
+    sys.exit(0)
+    pass
