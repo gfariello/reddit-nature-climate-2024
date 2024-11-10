@@ -10,8 +10,22 @@ complexity across millions of Reddit posts over a 16-year period.
 ## Table of Contents
 
 - [Project Overview](#project-overview)
+- [Obtaining Reddit Data](#obtaining-reddit-data)
+  - [Prerequisites](#prerequisites)
+  - [Step-by-Step Guide](#step-by-step-guide)
+    - [Step 1: Navigate to AcademicTorrents.com](#step-1-navigate-to-academictorrentscom)
+    - [Step 2: Find the Reddit Dataset](#step-2-find-the-reddit-dataset)
+    - [Step 3: Download the .torrent File or Use the Magnet Link](#step-3-download-the-torrent-file-or-use-the-magnet-link)
+    - [Step 4: Start the Download with aria2c](#step-4-start-the-download-with-aria2c)
+    - [Step 5: Verify and Access the Data](#step-5-verify-and-access-the-data)
+    - [Step 6: Decompressing .zst Files (If Needed)](#step-6-decompressing-zst-files-if-needed)
+    - [Step 7: Organize or Process the Data (Optional)](#step-7-organize-or-process-the-data-optional)
+    - [Step 8: Backup the Data (Optional)](#step-8-backup-the-data-optional)
+  - [Tips and Notes](#tips-and-notes)
 - [Setup and Installation](#setup-and-installation)
 - [Usage](#usage)
+  - [Available Arguments](#available-arguments)
+  - [Example](#example)
 - [Data](#data)
 - [Methodology](#methodology)
 - [Reproducibility](#reproducibility)
@@ -35,11 +49,14 @@ engagement and sentiment. Key insights include:
 - Increasing linguistic complexity in discussions involving "climate change,"
   potentially impacting accessibility and engagement.
 
-# Downloading Reddit Data from AcademicTorrents.com
+## Obtaining Reddit Data
+
+**NOTE:** This is optional. The raw extracted data is provided via the
+[Data Repository on FigShare](http://dx.doi.org/10.6084/m9.figshare.26828467).
 
 This guide provides detailed steps to download Reddit data in JSONL format from AcademicTorrents.com using a non-GUI torrent tool.
 
-## Prerequisites
+### Prerequisites
 
 1. **Install a Torrent Client**: Academic Torrents uses the BitTorrent protocol
    to distribute files. If you’re using Linux and prefer a non-GUI tool, you can
@@ -57,9 +74,9 @@ This guide provides detailed steps to download Reddit data in JSONL format from 
 2. **Ensure Sufficient Storage**: The Reddit dataset can be very large (over 2.8
    TB), so make sure you have ample storage space.
 
-## Step-by-Step Guide
+### Step-by-Step Guide
 
-### Step 1: Navigate to AcademicTorrents.com
+#### Step 1: Navigate to AcademicTorrents.com
 
 1. Open a web browser and go to
    [AcademicTorrents.com](https://academictorrents.com).
@@ -67,7 +84,7 @@ This guide provides detailed steps to download Reddit data in JSONL format from 
 2. In the search bar, type "Reddit" and press Enter. This will list available
    Reddit datasets, including monthly exports and the full dataset.
 
-### Step 2: Find the Reddit Dataset
+#### Step 2: Find the Reddit Dataset
 
 1. Look for the dataset titled something similar to **Reddit Data JSONL** or
    **Complete Reddit Dataset**. This dataset typically contains Reddit posts and
@@ -76,13 +93,13 @@ This guide provides detailed steps to download Reddit data in JSONL format from 
 2. Click on the dataset name to view details, including the dataset description,
    size, and download options.
 
-### Step 3: Download the .torrent File or Use the Magnet Link
+#### Step 3: Download the .torrent File or Use the Magnet Link
 
 1. On the dataset page, you’ll see options to either **Download .torrent** or **Copy Magnet Link**.
    - If using the **Download .torrent** option, save the `.torrent` file to your computer.
    - If using the **Magnet Link**, copy it to your clipboard (right-click and select “Copy link address”).
 
-### Step 4: Start the Download with aria2c
+#### Step 4: Start the Download with aria2c
 
 1. Open a terminal on your Linux machine.
 2. Use one of the following commands depending on whether you downloaded a `.torrent` file or copied the magnet link.
@@ -99,40 +116,45 @@ This guide provides detailed steps to download Reddit data in JSONL format from 
    file in the terminal. The download time will vary depending on your internet
    speed and the dataset size.
 
-### Step 5: Verify and Access the Data
+#### Step 5: Verify and Access the Data
 
 1. After the download is complete, navigate to the folder where you saved the
    dataset.
 
 2. The files should be in **JSONL** format, where each line in a file is a JSON
-   object representing a Reddit post or comment.
+   object representing a Reddit post or comment. These files may be compressed
+   in `.zst` (Zstandard) format, typically named as `RC_YYYY-MM.zst` for comments
+   and `RS_YYYY-MM.zst` for submissions. Decompression is necessary before 
+   processing, or you can use tools that support on-the-fly decompression.
 
-### Step 6: Organize or Process the Data (Optional)
+#### Step 6: Decompressing `.zst` Files (If Needed)
+
+To decompress `.zst` files before analysis, use the `unzstd` command (available
+via the `zstd` package):
+
+   ```bash
+   # Install zstd if needed
+   sudo apt install zstd
+
+   # Decompress a .zst file
+   unzstd RC_2018-10.zst
+   ```
+
+Alternatively, if your tools support it, you can process `.zst` files directly
+without decompression.
+
+#### Step 7: Organize or Process the Data (Optional)
 
 You may want to organize the files by year or month if they aren’t already
 organized this way. For efficient processing, you can use tools like `jq` or
 write Python scripts to filter or extract specific fields.
 
-### Step 7: Backup the Data (Optional)
+#### Step 8: Backup the Data (Optional)
 
 Consider backing up the downloaded files to an external drive or cloud storage
 given the dataset’s size.
 
-## Example: Loading JSONL Data in Python
-
-Once downloaded, you can load the JSONL files for analysis in Python as follows:
-
-```python
-import json
-
-# Replace 'path/to/reddit_data.jsonl' with the actual path to your JSONL file
-with open('path/to/reddit_data.jsonl', 'r') as file:
-    for line in file:
-        post = json.loads(line)
-        print(post)  # Each 'post' is a dictionary representing a Reddit post/comment
-```
-
-## Tips and Notes
+### Tips and Notes
 
 - **Monitor Disk Space**: Reddit datasets are large, and you may need to free up
     space as needed.
@@ -150,8 +172,8 @@ AcademicTorrents.com efficiently.
 
 1. **Clone the repository**
    ```bash
-   git clone git@github.com:gfariello/reddit-nature-climate-2024.git
-   cd reddit-nature-climate-2024
+   git clone git@github.com:gfariello/reddit-nature-commsenv-climate-2024.git
+   cd reddit-nature-commsenv-climate-2024
    ```
 
 2. **Install dependencies**
@@ -201,8 +223,7 @@ Our analysis leverages data from:
 
 Processed and supplementary data are available on FigShare for extended analysis:
 
-- **[Data Repository on
-    FigShare](http://dx.doi.org/10.6084/m9.figshare.26828467)**: Includes all
+- **[Data Repository on FigShare](http://dx.doi.org/10.6084/m9.figshare.26828467)**: Includes all
     raw data, cleaned data files, and analysis results.
 
 ## Methodology
