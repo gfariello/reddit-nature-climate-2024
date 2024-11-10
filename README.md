@@ -247,7 +247,7 @@ bash step-00.sh  --input-dir INPUT_DIR --output-dir OUTPUT_DIR --threads NUM_THR
 ```
 
 Be sure to chage `INPUT_DIR` to the parent directory in which (they can be
-several layers deep) the downloaded RC_20*.zst or RS_20*.zst files are
+several layers deep) the downloaded `RC_20*.zst` or `RS_20*.zst` files are
 located. If you downloaded the torrents described above, this will be the
 directory in which the `reddit` directory sits. Be to set `OUTPUT_DIR` to where
 you want the new files to be saved. This should not be the same as
@@ -256,12 +256,12 @@ simultaneously. Each process consumed about 2.2GB of RAM on our systems, so keep
 that in mind. By default, it will use all the processors available.
 
 If you set up the command-line correctly, this will find all files matching the
-RC_20*.zst or RS_20*.zst filenames in `INPUT_DIR` and extract all the posts
+`RC_20*.zst` or `RS_20*.zst` filenames in `INPUT_DIR` and extract all the posts
 whose title or body match the following regular expression:
 
 `climat.*chang|chang.*climat|glob.*warm|warm.*glob`
 
-And save them, in zstandard compressed format into OUTPUT_DIR with the same
+And save them, in zstandard compressed format into `OUTPUT_DIR` with the same
 filename. *CAUTION*: Again, please make sure that `INPUT_DIR` and `OUTPUT_DIR`
 are not the same.
 
@@ -275,7 +275,7 @@ From within the repository directory, run the following command:
 bash step-01.sh  --input-dir INPUT_DIR --threads NUM_THREADS
 ```
 
-*Note*: In this case `INPUT_DIR` will likely be the `OUTPUT_DIR` from *Step 00*.
+**Note**: In this case `INPUT_DIR` will likely be the `OUTPUT_DIR` from *Step 00*.
 
 The processes spawned by this script tend to use less RAM since they are running
 on much smaller files; however, use caution when running many, nevertheless.
