@@ -97,7 +97,7 @@ process_files() {
         python3 "${SCRIPT_DIR}/step-01-jsonl2csv" -i "${file}" 2>&1 >> "${output_dir}/logs/${bname}.log" &
 
         # Don't launch too many at once.
-        sleep 0.1
+        sleep 1.125
 
         # Increment active threads counter
         increment_threads

@@ -17,9 +17,7 @@ complexity across millions of Reddit posts over a 16-year period.
   - [Step-by-Step Guide](#step-by-step-guide)
   - [Tips and Notes](#tips-and-notes)
 - [Setup and Installation](#setup-and-installation)
-- [Usage](#usage)
-  - [Available Arguments](#available-arguments)
-  - [Example](#example)
+- [Processing the Original Reddit Files](#processing-the-original-reddit-files)
 - [Data](#data)
 - [Methodology](#methodology)
 - [Reproducibility](#reproducibility)
@@ -236,24 +234,53 @@ AcademicTorrents.com efficiently.
    USER_AGENT=<your-user-agent>
    ```
 
-## Usage
+# Processing the Original Reddit Files
 
-Run the main analysis script to collect data, perform text analysis, and
-generate visualizations:
+This repository has only been tested on Ubuntu 20.04.* LTS and Ubuntu 22.04.* LTS.
+
+## Step 00
+
+From within the repository directory, run the following command:
 
 ```bash
-python main.py --subreddit climate --start-date 2005-01-01 --end-date 2021-06-30
+bash step-00.sh  --input-dir INPUT_DIR --output-dir OUTPUT_DIR --threads NUM_THREADS
 ```
 
-### Available Arguments
-- `--subreddit`: Subreddit to scrape (e.g., `climate`, `environment`).
-- `--start-date`: Start date for data collection (YYYY-MM-DD).
-- `--end-date`: End date for data collection (YYYY-MM-DD).
+Be sure to chage `INPUT_DIR` to the parent directory in which (they can be
+several layers deep) the downloaded RC_20*.zst or RS_20*.zst files are
+located. If you downloaded the torrents described above, this will be the
+directory in which the `reddit` directory sits. Be to set `OUTPUT_DIR` to where
+you want the new files to be saved. This should not be the same as
+`INPUT_DIR`. Set `NUM_THREADS` to the maximum number of threads to run
+simultaneously. Each process consumed about 2.2GB of RAM on our systems, so keep
+that in mind. By default, it will use all the processors available.
 
-### Example
+If you set up the command-line correctly, this will find all files matching the
+RC_20*.zst or RS_20*.zst filenames in `INPUT_DIR` and extract all the posts
+whose title or body match the following regular expression:
+
+`climat.*chang|chang.*climat|glob.*warm|warm.*glob`
+
+And save them, in zstandard compressed format into OUTPUT_DIR with the same
+filename. *CAUTION*: Again, please make sure that `INPUT_DIR` and `OUTPUT_DIR`
+are not the same.
+
+When this is complete, move on to the next step.
+
+## Step 01
+
+From within the repository directory, run the following command:
+
 ```bash
-python main.py --subreddit climate --start-date 2020-01-01 --end-date 2020-12-31
+bash step-01.sh  --input-dir INPUT_DIR --threads NUM_THREADS
 ```
+
+*Note*: In this case `INPUT_DIR` will likely be the `OUTPUT_DIR` from *Step 00*.
+
+The processes spawned by this script tend to use less RAM since they are running
+on much smaller files; however, use caution when running many, nevertheless.
+
+Running the above will create CSV files ready for processing for subsequent steps.
 
 ## Data
 
