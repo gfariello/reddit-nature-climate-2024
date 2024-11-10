@@ -60,7 +60,10 @@ class ClimateFilterProc(ProcInfo):
             input_file (str): Path or URL to a Reddit JSONL file to process.
         """
         input_path = Path(input_file)
-        output_path = self.output_dir / f"{input_path.stem}.zst"
+        subdir = "Comments" if input_path.stem.startswith("RC_") else "Submissions"
+        output_path = self.output_dir / subdir / f"{input_path.stem}.zst"
+
+        self.mkdir(output_path.parent)
 
         # Check if the output file already exists
         if output_path.exists():
