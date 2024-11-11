@@ -263,9 +263,12 @@ AcademicTorrents.com using a non-GUI torrent tool.
 The following files are provided to check consistency. We updated them to include
 the most recent files available at the time of this writing:
 ```plaintext
-        Checksums/step-00-file-md5sums.txt
-        Checksums/step-00-file-record-counts.csv
+  Checksums/step-00-file-md5sums.txt
+  Checksums/step-00-file-record-counts.csv
 ```
+
+As of 2024-11-11 the Reddit data was available up until `2024-10` with a total
+of 22,926,415,555 (approx. 23 Billion) records.
 
 - **Monitor Disk Space**: Reddit datasets are large, and you may need to free up
     space as needed.
