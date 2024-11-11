@@ -614,7 +614,7 @@ class Proc(RedditHeaderInfo):
         self._start_time = time.time()
         self.mkdir(self.step_02_dir)
         # Path to the headers.csv file
-        headers_csv_path = os.path.join(self.step_02_dir, "headers.csv")
+        headers_csv_path = os.path.join(self.step_02_dir, "step-02-headers.csv")
         try:
             if self.file_older_than_24_hours(headers_csv_path) or self.args.create_headers:
                 with self.open(headers_csv_path, 'w') as fh:
@@ -710,8 +710,8 @@ class Proc(RedditHeaderInfo):
             pass
 
         # Path to the headers-info.txt file
-        headers_info_txt_path = os.path.join(self.step_02_dir, "headers-info.txt")
-        self.info_file = os.path.join(self.step_02_dir, "Step-02-Extracted-CSVs-Substep-02.processed-file-info.csv")
+        headers_info_txt_path = os.path.join(self.step_02_dir, "step-02-headers-info.txt")
+        self.info_file = os.path.join(self.step_02_dir, "step-02-processed-file-info.csv")
         try:
             if self.file_older_than_24_hours(headers_info_txt_path) or self.args.create_headers:
                 with self.open(headers_info_txt_path, 'w') as fh:
