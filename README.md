@@ -25,9 +25,6 @@ complexity across millions of Reddit posts over a 16-year period.
     - [Step 00 Substep 03: Download the .torrent File or Use the Magnet Link](#step-00-substep-03-download-the-torrent-file-or-use-the-magnet-link)
     - [Step 00 Substep 04: Start the Download with aria2c](#step-00-substep-04-start-the-download-with-aria2c)
     - [Step 00 Substep 05: Verify and Access the Data](#step-00-substep-05-verify-and-access-the-data)
-    - [Step 00 Substep 06: Decompressing `.zst` Files (If Needed)](#step-00-substep-06-decompressing-zst-files-if-needed)
-    - [Step 00 Substep 07: Organize or Process the Data (Optional)](#step-00-substep-07-organize-or-process-the-data-optional)
-    - [Step 00 Substep 08: Backup the Data (Optional)](#step-00-substep-08-backup-the-data-optional)
     - [Tips and Notes](#tips-and-notes)
   - [Step 01 Extracting Climate Related Posts](#step-01-extracting-climate-related-posts)
   - [Step 02 Converting JSONL Files to CSV Files](#step-02-converting-jsonl-files-to-csv-files)
@@ -49,8 +46,8 @@ FigShare](http://dx.doi.org/10.6084/m9.figshare.26828467). This section, along
 with the following [Generating Figures](#generating-figures) section, is
 sufficient to replicate the findings and figures of the study. If you are only
 interested in reproducing the figures and analysis, you can skip the
-[Step 00: Obtaining Complete Reddit Data](#obtaining-complete-reddit-data) and
-subsequent sections.
+[Preprocessing Original Reddit Data (Optional)](#preprocessing-original-reddit-data-optional)
+and subsequent sections.
 
 ### Generating Figures
 
@@ -261,33 +258,6 @@ AcademicTorrents.com using a non-GUI torrent tool.
    before processing, or you can use tools that support on-the-fly
    decompression.
 
-#### Step 00 Substep 06: Decompressing `.zst` Files (If Needed)
-
-To decompress `.zst` files before analysis, use the `unzstd` command (available
-via the `zstd` package):
-
-   ```bash
-   # Install zstd if needed
-   sudo apt install zstd
-
-   # Decompress a .zst file
-   unzstd RC_2018-10.zst
-   ```
-
-Alternatively, if your tools support it, you can process `.zst` files directly
-without decompression.
-
-#### Step 00 Substep 07: Organize or Process the Data (Optional)
-
-You may want to organize the files by year or month if they aren’t already
-organized this way. For efficient processing, you can use tools like `jq` or
-write Python scripts to filter or extract specific fields.
-
-#### Step 00 Substep 08: Backup the Data (Optional)
-
-Consider backing up the downloaded files to an external drive or cloud storage
-given the dataset’s size.
-
 #### Tips and Notes
 
 - **Monitor Disk Space**: Reddit datasets are large, and you may need to free up
@@ -339,7 +309,7 @@ From within the repository directory, run the following command:
 bash step-02.sh  --input-dir INPUT_DIR --threads NUM_THREADS
 ```
 
-**Note**: In this case `INPUT_DIR` will likely be the `OUTPUT_DIR` from *Step 00*.
+**Note**: In this case `INPUT_DIR` will likely be the `OUTPUT_DIR` from *Step 01*.
 
 The processes spawned by this script tend to use less RAM since they are running
 on much smaller files; however, use caution when running many, nevertheless.
