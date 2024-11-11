@@ -1,4 +1,4 @@
-# Reddit Nature COMMSENV Climate 2024
+# Reddit Nature CommsEnv Climate 2024
 
 This repository contains the code, instructions, and data necessary to reproduce
 the findings in our paper, tentatively accepted to *Nature Communications Earth
@@ -9,10 +9,11 @@ complexity across millions of Reddit posts over a 16-year period.
 
 ## Table of Contents
 
+- [Quick Start](#quick-start) for the impatient.
+  - [Obtaining Relevant Data](#obtaining-relevant-data)
+  - [Generating Figures](#generating-figures)
 - [Project Overview](#project-overview)
-- [Obtaining Relevant Data](#obtaining-relevant-data)
-- [Generating Figures](#generating-figures)
-- [Obtaining Complete Reddit Data](#obtaining-complete-reddit-data) (Optional)
+- [Step 00: Obtaining Complete Reddit Data](#step-00-obtaining-complete-reddit-data) (Optional)
   - [Prerequisites](#prerequisites)
   - [Step-by-Step Guide](#step-by-step-guide)
   - [Tips and Notes](#tips-and-notes)
@@ -24,17 +25,25 @@ complexity across millions of Reddit posts over a 16-year period.
 - [Contributing](#contributing)
 - [License](#license)
 
-## Obtaining Relevant Data
+## Quick Start
+
+If what you want to do is replicate the findings without doing the very lengthy
+ pre-processing of the original ~10TB of Reddit data, you can use use the few
+ gigabytes of data available below and you can use the *live* [Google Colab
+ Notebook](https://colab.research.google.com/drive/1PpIRVvIvzowMVH44hjXSuFX6AGdV93YI?authuser=1#revisionId=0B1uzaQumGqFNRm5BdU94a0YydFk0Ym5jZFEwMjEvSUZsbkNzPQ)
+ to run the analyses. It will download the data for you.
+
+### Obtaining Relevant Data
 
 All the data used in the manuscript is freely available at [Data Repository on
 FigShare](http://dx.doi.org/10.6084/m9.figshare.26828467). This section, along
 with the following [Generating Figures](#generating-figures) section, is
 sufficient to replicate the findings and figures of the study. If you are only
 interested in reproducing the figures and analysis, you can skip the
-[Obtaining Complete Reddit Data](#obtaining-complete-reddit-data) and
+[Step 00: Obtaining Complete Reddit Data](#obtaining-complete-reddit-data) and
 subsequent sections.
 
-## Generating Figures
+### Generating Figures
 
 All figures presented in the analysis can be reproduced using the extracted and
 derived data by accessing the live Google Colab page. This Colab notebook
@@ -85,7 +94,7 @@ With `PolyReader` and `PolyWriter`, there’s no need to decompress files in
 advance, even for remote or compressed data sources, making it easier to process
 Reddit’s vast data archives.
 
-## Obtaining Complete Reddit Data
+## Step 00: Obtaining Complete Reddit Data
 
 **NOTE:** This is optional. The raw extracted data is provided via the
 [Data Repository on FigShare](http://dx.doi.org/10.6084/m9.figshare.26828467).
