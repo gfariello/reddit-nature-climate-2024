@@ -238,12 +238,12 @@ AcademicTorrents.com efficiently.
 
 This repository has only been tested on Ubuntu 20.04.* LTS and Ubuntu 22.04.* LTS.
 
-## Step 00
+## Step 01
 
 From within the repository directory, run the following command:
 
 ```bash
-bash step-00.sh  --input-dir INPUT_DIR --output-dir OUTPUT_DIR --threads NUM_THREADS
+bash step-01.sh  --input-dir INPUT_DIR --output-dir OUTPUT_DIR --threads NUM_THREADS
 ```
 
 Be sure to chage `INPUT_DIR` to the parent directory in which (they can be
@@ -267,12 +267,12 @@ are not the same.
 
 When this is complete, move on to the next step.
 
-## Step 01
+## Step 02
 
 From within the repository directory, run the following command:
 
 ```bash
-bash step-01.sh  --input-dir INPUT_DIR --threads NUM_THREADS
+bash step-02.sh  --input-dir INPUT_DIR --threads NUM_THREADS
 ```
 
 **Note**: In this case `INPUT_DIR` will likely be the `OUTPUT_DIR` from *Step 00*.

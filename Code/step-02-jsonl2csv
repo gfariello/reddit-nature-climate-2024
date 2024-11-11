@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-step-01-jsonl2csv - A script to process JSONL files from PushShift.io for Reddit data,
+step-02-jsonl2csv - A script to process JSONL files from PushShift.io for Reddit data,
 extracting information into structured CSV files.
 
 This script processes compressed Reddit JSONL data files, specifically from the PushShift.io
@@ -25,7 +25,7 @@ Key Functions
 
 Usage
 -----
-    step-01-jsonl2csv -i INPUT_FILE -o OUTPUT_DIR [options]
+    step-02-jsonl2csv -i INPUT_FILE -o OUTPUT_DIR [options]
 
 Options
 -------
@@ -46,7 +46,7 @@ Attributes
 
 Example
 -------
-    python3 step-01-jsonl2csv -i data/RC_2023-03.zst -o output/Step-01-Extracted-CSVs
+    python3 step-02-jsonl2csv -i data/RC_2023-03.zst -o output/Step-02-Extracted-CSVs
 
 Dependencies
 ------------
@@ -139,7 +139,7 @@ class Proc(RedditHeaderInfo):
         args = parser.parse_args()
         args.verbosity = 1 + args.verbosity - args.quiet
         args.input_dir = Path(args.input_file).parent.parent
-        args.output_dir = args.input_dir.parent / 'Step-01-Extracted-CSVs'
+        args.output_dir = args.input_dir.parent / 'Step-02-Extracted-CSVs'
         args.log_dir = args.output_dir / 'logs'
         super().__init__(args)
         if self.args.num_lines_info > self.args.lines_per_file:
@@ -172,11 +172,11 @@ class Proc(RedditHeaderInfo):
                         'third_party_tracking_2', 'thumbnail', 'thumbnail_height',
                         'thumbnail_width', 'ups', 'whitelist_status', 'title_text', 'body_text', ]
         self._output_fh = None
-        self.step_00_dir = self.args.input_dir
-        self.step_01_dir = self.args.output_dir
-        self.info(f"Step 00 Directory: {self.step_00_dir}")
+        self.step_01_dir = self.args.input_dir
+        self.step_02_dir = self.args.output_dir
         self.info(f"Step 01 Directory: {self.step_01_dir}")
-        self.args.log_dir = os.path.join(self.step_01_dir, 'logs')
+        self.info(f"Step 02 Directory: {self.step_02_dir}")
+        self.args.log_dir = os.path.join(self.step_02_dir, 'logs')
         self.args.log_filename = os.path.join(self.args.log_dir, f"{os.path.basename(args.input_file)}-{self.UNIQUE_BASENAME}.log")
         match = re.match(r'^R(C|S)_(\d{4}-\d{2})\.zst$', os.path.basename(self.args.input_file))
         if not match:
@@ -185,8 +185,8 @@ class Proc(RedditHeaderInfo):
         self.file_month = match.group(2)
         self.file_count = 0
         self.output_file = None
-        self.sorted_dir = os.path.join(self.step_01_dir, f"{self.post_type}s", "sorted")
-        self.final_output_file = os.path.join(self.step_01_dir, f"{self.post_type}s", f"Reddit{self.post_type}s-{self.file_month}.csv.zst")
+        self.sorted_dir = os.path.join(self.step_02_dir, f"{self.post_type}s", "sorted")
+        self.final_output_file = os.path.join(self.step_02_dir, f"{self.post_type}s", f"Reddit{self.post_type}s-{self.file_month}.csv.zst")
         self.mkdir(self.sorted_dir)
         self.null_parent_ids = 0
         self.int_parent_ids = 0
@@ -396,11 +396,11 @@ class Proc(RedditHeaderInfo):
         Example usage:
             self.merge_sorted(1000)
         """
-        to_file = os.path.join(self.step_01_dir, f"{self.post_type}s", f"Reddit{self.post_type}s-{self.file_month}.csv.zst")
+        to_file = os.path.join(self.step_02_dir, f"{self.post_type}s", f"Reddit{self.post_type}s-{self.file_month}.csv.zst")
 
         # If there's only one file, rename it to the target file
         if len(self.temp_files) == 1:
-            from_file = os.path.join(self.step_01_dir, f"{self.post_type}s", "sorted", f"Reddit{self.post_type}s-{self.file_month}.001.csv.zst")
+            from_file = os.path.join(self.step_02_dir, f"{self.post_type}s", "sorted", f"Reddit{self.post_type}s-{self.file_month}.001.csv.zst")
             self.info(f"Only one file for {os.path.basename(self.args.input_file)}. Renaming {from_file} to {to_file}")
             os.rename(from_file, to_file)
             return
@@ -612,9 +612,9 @@ class Proc(RedditHeaderInfo):
 
     def run(self):
         self._start_time = time.time()
-        self.mkdir(self.step_01_dir)
+        self.mkdir(self.step_02_dir)
         # Path to the headers.csv file
-        headers_csv_path = os.path.join(self.step_01_dir, "headers.csv")
+        headers_csv_path = os.path.join(self.step_02_dir, "headers.csv")
         try:
             if self.file_older_than_24_hours(headers_csv_path) or self.args.create_headers:
                 with self.open(headers_csv_path, 'w') as fh:
@@ -710,8 +710,8 @@ class Proc(RedditHeaderInfo):
             pass
 
         # Path to the headers-info.txt file
-        headers_info_txt_path = os.path.join(self.step_01_dir, "headers-info.txt")
-        self.info_file = os.path.join(self.step_01_dir, "Step-01-Extracted-CSVs-Substep-01.processed-file-info.csv")
+        headers_info_txt_path = os.path.join(self.step_02_dir, "headers-info.txt")
+        self.info_file = os.path.join(self.step_02_dir, "Step-02-Extracted-CSVs-Substep-02.processed-file-info.csv")
         try:
             if self.file_older_than_24_hours(headers_info_txt_path) or self.args.create_headers:
                 with self.open(headers_info_txt_path, 'w') as fh:

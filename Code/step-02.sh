@@ -12,11 +12,10 @@ usage() {
     info "$(basename "$0") --input-dir dir --output-dir dir [--threads num]"
     info
     info "Recursively finds all JSONL files in the specified input directory and"
-    info "runs Code/step-00-reddit-jsonl-climate-filter on each file using a specified"
+    info "runs Code/step-02-jsonl2csv on each file using a specified"
     info "number of threads. Results are saved in the specified output directory."
     info
     info "  --input-dir dir      The directory where JSONL files are located (required)."
-    info "  --output-dir dir     The directory where output files will be saved (required)."
     info "  --threads num        Number of threads to use. Defaults to ${DEFAULT_THREADS}."
     info "  --help or -h         Print this usage statement."
 }
@@ -26,10 +25,6 @@ while [[ $# -gt 0 ]]; do
     case "$1" in
         --input-dir)
             input_dir="$2"
-            shift; shift;
-            ;;
-        --output-dir)
-            output_dir="$2"
             shift; shift;
             ;;
         --threads)
@@ -47,16 +42,25 @@ while [[ $# -gt 0 ]]; do
 done
 
 # Check required arguments
-if [ -z "${input_dir}" ] || [ -z "${output_dir}" ]; then
+if [ -z "${input_dir}" ]; then
     usage
-    err "--input-dir and --output-dir are required."
+    err "--input-dir is required."
     exit 1
+fi
+
+# Verify that input_dir contains 'Step-01-JSONL' directory
+if [ ! -d "${input_dir}/Step-01-JSONL" ]; then
+    usage
+    fatal "No 'Step-01-JSONL' directory found in ${input_dir}."
 fi
 
 # Set number of threads to the default if not provided
 if [ -z "${num_threads}" ]; then
     num_threads=${DEFAULT_THREADS}
 fi
+
+output_dir="${input_dir}/Step-02-Extracted-CSVs"
+input_dir="${input_dir}/Step-01-JSONL"
 
 # Create output directory if it doesn't exist
 mkdir_if "${output_dir}"
@@ -90,11 +94,10 @@ process_files() {
         bname=$(basename "${file}")
 
         # Run the climate filter script in a subshell
-        python3 "${SCRIPT_DIR}/step-00-reddit-jsonl-climate-filter" \
-                --output-dir "${output_dir}" "${file}" 2>&1 >> "${output_dir}/logs/${bname}.log" &
+        python3 "${SCRIPT_DIR}/step-02-jsonl2csv" -i "${file}" 2>&1 >> "${output_dir}/logs/${bname}.log" &
 
         # Don't launch too many at once.
-        sleep 0.1
+        sleep 1.125
 
         # Increment active threads counter
         increment_threads
