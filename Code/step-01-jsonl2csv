@@ -138,7 +138,9 @@ class Proc(RedditHeaderInfo):
         ProcInfo.set_argparse_parser(parser)
         args = parser.parse_args()
         args.verbosity = 1 + args.verbosity - args.quiet
-        args.log_dir = Path(args.input_file).parent.parent / 'Step-01-Extracted-CSVs' / 'logs'
+        args.input_dir = Path(args.input_file).parent.parent
+        args.output_dir = args.input_dir.parent / 'Step-01-Extracted-CSVs'
+        args.log_dir = args.output_dir / 'logs'
         super().__init__(args)
         if self.args.num_lines_info > self.args.lines_per_file:
             return self.fatal(f"--lines-per-file {self.args.lines_per_file} must be greater than or equal to --num-lines-info {self.args.num_lines_info}")
@@ -170,12 +172,10 @@ class Proc(RedditHeaderInfo):
                         'third_party_tracking_2', 'thumbnail', 'thumbnail_height',
                         'thumbnail_width', 'ups', 'whitelist_status', 'title_text', 'body_text', ]
         self._output_fh = None
-        self.step_00_dir = Path(self.args.input_file).parent
-        self.step_01_dir = self.step_00_dir.parent / 'Step-01-Extracted-CSVs'
+        self.step_00_dir = self.args.input_dir
+        self.step_01_dir = self.args.output_dir
         self.info(f"Step 00 Directory: {self.step_00_dir}")
         self.info(f"Step 01 Directory: {self.step_01_dir}")
-        if not self.step_00_dir.name == 'Step-00-JSONL':
-            return self.fatal(f"Expecting {self.args.input_file} to be in a Step-00-JSONL directory")
         self.args.log_dir = os.path.join(self.step_01_dir, 'logs')
         self.args.log_filename = os.path.join(self.args.log_dir, f"{os.path.basename(args.input_file)}-{self.UNIQUE_BASENAME}.log")
         match = re.match(r'^R(C|S)_(\d{4}-\d{2})\.zst$', os.path.basename(self.args.input_file))
